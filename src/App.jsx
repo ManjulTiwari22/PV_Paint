@@ -1,11 +1,10 @@
-import  { useState, useEffect } from "react"
+const LOSS_FACTOR = 1.3 // 30% loss factor
+
+import { useState, useEffect } from "react"
 import { Card } from "./components/ui/card"
 import { Label } from "./components/ui/label"
 import { Input } from "./components/ui/input"
-import {
-  Select,
-
-} from "./components/ui/select"
+import { Select } from "./components/ui/select"
 import { Checkbox } from "./components/ui/checkbox"
 
 const paintTypes = {
@@ -85,21 +84,30 @@ export default function App() {
     const externalArea = 2 * Math.PI * radius * (radius + lengthInMeters)
     const internalArea = includeInternal ? 2 * Math.PI * internalRadius * (internalRadius + lengthInMeters) : 0
 
+    // After the existing surface area calculations, add:
+    const externalDishEndArea = 1.27 * Math.PI * Math.pow(diameter / 1000, 2)
+    const totalExternalDishEndArea = 2 * externalDishEndArea
+    const internalDishEndArea = includeInternal ? 1.27 * Math.PI * Math.pow((diameter - 2 * thickness) / 1000, 2) : 0
+    const totalInternalDishEndArea = 2 * internalDishEndArea
+
+    const totalExternalSurfaceArea = externalArea + totalExternalDishEndArea
+    const totalInternalSurfaceArea = internalArea + totalInternalDishEndArea
+
     // Calculate paint volumes
-    const calculatePaintVolume = (area, dft, volumeSolids) => (area * dft) / (10 * volumeSolids)
+    const calculatePaintVolume = (area, dft, volumeSolids) => (area * dft * LOSS_FACTOR) / (10 * volumeSolids)
 
     const coats = useSpecialPurpose
       ? ["primer", "intermediate", "topcoat", "specialPurpose"]
       : ["primer", "intermediate", "topcoat"]
 
     const externalVolumes = coats.reduce((acc, coat) => {
-      acc[coat] = calculatePaintVolume(externalArea, paints[coat].dft, paints[coat].volumeSolids)
+      acc[coat] = calculatePaintVolume(totalExternalSurfaceArea, paints[coat].dft, paints[coat].volumeSolids)
       return acc
     }, {})
 
     const internalVolumes = includeInternal
       ? coats.reduce((acc, coat) => {
-          acc[coat] = calculatePaintVolume(internalArea, paints[coat].dft, paints[coat].volumeSolids)
+          acc[coat] = calculatePaintVolume(totalInternalSurfaceArea, paints[coat].dft, paints[coat].volumeSolids)
           return acc
         }, {})
       : {}
@@ -111,13 +119,17 @@ export default function App() {
     const totalVolume = totalExternalVolume + totalInternalVolume
 
     setResult({
-      externalArea,
-      internalArea,
+      externalArea: totalExternalSurfaceArea,
+      internalArea: totalInternalSurfaceArea,
       externalVolumes,
       internalVolumes,
       totalExternalVolume,
       totalInternalVolume,
       totalVolume,
+      externalDishEndArea,
+      totalExternalDishEndArea,
+      internalDishEndArea,
+      totalInternalDishEndArea,
     })
   }
 
@@ -232,30 +244,59 @@ export default function App() {
         {result && (
           <div className="results">
             <h3>Results:</h3>
-            <p>External Surface Area: {result.externalArea.toFixed(2)} m²</p>
-            {includeInternal && <p>Internal Surface Area: {result.internalArea.toFixed(2)} m²</p>}
+            <p>Total External Surface Area: {result.externalArea.toFixed(2)} m²</p>
+            
+            {includeInternal && (
+              <>
+                <p>Total Internal Surface Area: {result.internalArea.toFixed(2)} m²</p>
+                
+              </>
+            )}
 
-            <h4>External Paint :</h4>
+            <h4>External Paint:</h4>
             {Object.entries(result.externalVolumes).map(([coat, volume]) => (
               <p key={coat}>
-                {coat.charAt(0).toUpperCase() + coat.slice(1)} Paint: {volume.toFixed(2)} liters
+                {coat.charAt(0).toUpperCase() + coat.slice(1)} Paint:
+                
+                {volume.toFixed(2)} liters 
               </p>
             ))}
-            <p>Total External Paint : {result.totalExternalVolume.toFixed(2)} liters</p>
+            <p>
+              Total External Paint:
+              
+              {result.totalExternalVolume.toFixed(2)} liters 
+            </p>
 
             {includeInternal && (
               <>
                 <h4>Internal Paint:</h4>
                 {Object.entries(result.internalVolumes).map(([coat, volume]) => (
                   <p key={coat}>
-                    {coat.charAt(0).toUpperCase() + coat.slice(1)} Paint : {volume.toFixed(2)} liters
+                    {coat.charAt(0).toUpperCase() + coat.slice(1)} Paint:
+                    
+                    {volume.toFixed(2)} liters 
                   </p>
                 ))}
-                <p>Total Internal Paint: {result.totalInternalVolume.toFixed(2)} liters</p>
+                <p>
+                  Total Internal Paint:
+                  
+                  {result.totalInternalVolume.toFixed(2)} liters 
+                </p>
               </>
             )}
 
-            <p>Total Paint: {result.totalVolume.toFixed(2)} liters</p>
+            <p>
+              Total Paint:
+              
+              {result.totalVolume.toFixed(2)} liters 
+            </p>
+
+            <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 rounded-md">
+              <p className="text-sm text-yellow-700 font-medium">
+                <strong>Note:</strong> 30% in Surface area (External & Internal) considered as loss factor & attachments
+                like Nozzles, Lifting Lugs, etc.
+              </p>
+            </div>
           </div>
         )}
       </Card>
